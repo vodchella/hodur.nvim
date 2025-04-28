@@ -12,17 +12,26 @@ local function strip_wrapping_chars(s)
     ["<"] = ">",
     ["`"] = "`",
   }
-  local first = s:sub(1, 1)
-  local last = s:sub(-1)
-
-  if pairs[first] and pairs[first] == last then
-    return s:sub(2, -2)
+  while true do
+    local first = s:sub(1, 1)
+    local last = s:sub(-1)
+    if pairs[first] and pairs[first] == last then
+      s = s:sub(2, -2)
+    else
+      break
+    end
   end
   return s
 end
 
+-- ':' НЕ разделитель!
 local function is_separator(char)
-  return not char or char:match("[%s%[%]{}()<>\'\"`]")
+  return not char or char:match("[%s%[%]{}()<>'\"`]")
+end
+
+local function should_continue_down(line)
+  local last_char = line:sub(-1)
+  return last_char == "." or last_char == ":"
 end
 
 function M.open_under_cursor()
@@ -30,12 +39,12 @@ function M.open_under_cursor()
   local total_lines = vim.api.nvim_buf_line_count(buf)
 
   local pos = vim.api.nvim_win_get_cursor(0)
-  local row = pos[1] - 1  -- 0-based строки
-  local col = pos[2]      -- 0-based колонка
+  local row = pos[1] - 1 -- 0-based строки
+  local col = pos[2]     -- 0-based колонка
 
   local result = ""
 
-  -- Сначала двигаемся влево
+  -- Идём влево
   do
     local cur_row = row
     local cur_col = col
@@ -56,18 +65,22 @@ function M.open_under_cursor()
         break
       end
 
+      -- Переход на строку выше
       cur_row = cur_row - 1
       if cur_row >= 0 then
-        line = vim.api.nvim_buf_get_lines(buf, cur_row, cur_row + 1, false)[1] or ""
-        cur_col = #line - 1
-        if line:match("^%s*$") then
+        local prev_line = vim.api.nvim_buf_get_lines(buf, cur_row, cur_row + 1, false)[1] or ""
+        if prev_line:match("^%s*$") then
+          break
+        end
+        cur_col = #prev_line - 1
+        if not should_continue_down(prev_line) then
           break
         end
       end
     end
   end
 
-  -- Теперь двигаемся вправо
+  -- Идём вправо
   do
     local cur_row = row
     local cur_col = col + 1
@@ -88,18 +101,23 @@ function M.open_under_cursor()
         break
       end
 
+      -- Переход на строку ниже
       cur_row = cur_row + 1
       cur_col = 0
       if cur_row < total_lines then
-        line = vim.api.nvim_buf_get_lines(buf, cur_row, cur_row + 1, false)[1] or ""
-        if line:match("^%s*$") then
+        local next_line = vim.api.nvim_buf_get_lines(buf, cur_row, cur_row + 1, false)[1] or ""
+        if next_line:match("^%s*$") then
+          break
+        end
+        local prev_line = vim.api.nvim_buf_get_lines(buf, cur_row - 1, cur_row, false)[1] or ""
+        if not should_continue_down(prev_line) then
           break
         end
       end
     end
   end
 
-  -- Финальная обработка строки
+  -- Обрезка кавычек и пробелов
   result = result:gsub("^%s+", ""):gsub("%s+$", "")
   result = strip_wrapping_chars(result)
 
@@ -122,7 +140,7 @@ function M.open_under_cursor()
     vim.cmd.edit(vim.fn.fnameescape(expanded_path))
     vim.api.nvim_win_set_cursor(0, { tonumber(lineno), tonumber(colno) - 1 })
 
-    -- Подсвечиваем строку в новом буфере
+    -- Подсветка строки
     local target_buf = vim.api.nvim_get_current_buf()
     vim.api.nvim_buf_clear_namespace(target_buf, ns_id, 0, -1)
     vim.api.nvim_buf_add_highlight(target_buf, ns_id, 'Visual', tonumber(lineno) - 1, 0, -1)
