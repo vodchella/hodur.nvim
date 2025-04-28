@@ -1,60 +1,139 @@
 local M = {}
 
+local ns_id = vim.api.nvim_create_namespace('highlight_opened_line')
+
+local function strip_wrapping_chars(s)
+  local pairs = {
+    ['"'] = '"',
+    ["'"] = "'",
+    ["("] = ")",
+    ["["] = "]",
+    ["{"] = "}",
+    ["<"] = ">",
+    ["`"] = "`",
+  }
+  local first = s:sub(1, 1)
+  local last = s:sub(-1)
+
+  if pairs[first] and pairs[first] == last then
+    return s:sub(2, -2)
+  end
+  return s
+end
+
+local function is_separator(char)
+  return not char or char:match("[%s%[%]{}()<>\'\"`]")
+end
+
 function M.open_under_cursor()
-  local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-  local line = vim.fn.getline('.')
+  local buf = vim.api.nvim_get_current_buf()
+  local total_lines = vim.api.nvim_buf_line_count(buf)
 
-  local start_col = col
-  local end_col = col
+  local pos = vim.api.nvim_win_get_cursor(0)
+  local row = pos[1] - 1  -- 0-based строки
+  local col = pos[2]      -- 0-based колонка
 
-  local function is_separator(char)
-    return char == nil or char:match("[%s]")
+  local result = ""
+
+  -- Сначала двигаемся влево
+  do
+    local cur_row = row
+    local cur_col = col
+
+    while cur_row >= 0 do
+      local line = vim.api.nvim_buf_get_lines(buf, cur_row, cur_row + 1, false)[1] or ""
+
+      while cur_col >= 0 do
+        local c = line:sub(cur_col + 1, cur_col + 1)
+        if is_separator(c) then
+          break
+        end
+        result = c .. result
+        cur_col = cur_col - 1
+      end
+
+      if cur_col >= 0 then
+        break
+      end
+
+      cur_row = cur_row - 1
+      if cur_row >= 0 then
+        line = vim.api.nvim_buf_get_lines(buf, cur_row, cur_row + 1, false)[1] or ""
+        cur_col = #line - 1
+        if line:match("^%s*$") then
+          break
+        end
+      end
+    end
   end
 
-  while start_col > 0 and not is_separator(line:sub(start_col, start_col)) do
-    start_col = start_col - 1
-  end
-  if start_col ~= col then
-    start_col = start_col + 1
+  -- Теперь двигаемся вправо
+  do
+    local cur_row = row
+    local cur_col = col + 1
+
+    while cur_row < total_lines do
+      local line = vim.api.nvim_buf_get_lines(buf, cur_row, cur_row + 1, false)[1] or ""
+
+      while cur_col < #line do
+        local c = line:sub(cur_col + 1, cur_col + 1)
+        if is_separator(c) then
+          break
+        end
+        result = result .. c
+        cur_col = cur_col + 1
+      end
+
+      if cur_col < #line then
+        break
+      end
+
+      cur_row = cur_row + 1
+      cur_col = 0
+      if cur_row < total_lines then
+        line = vim.api.nvim_buf_get_lines(buf, cur_row, cur_row + 1, false)[1] or ""
+        if line:match("^%s*$") then
+          break
+        end
+      end
+    end
   end
 
-  while end_col < #line and not is_separator(line:sub(end_col + 1, end_col + 1)) do
-    end_col = end_col + 1
-  end
+  -- Финальная обработка строки
+  result = result:gsub("^%s+", ""):gsub("%s+$", "")
+  result = strip_wrapping_chars(result)
 
-  local target = line:sub(start_col, end_col)
-  target = target:gsub("^%s+", ""):gsub("%s+$", "")
-
+  -- Парсим путь: файл[:строка[:колонка]]
   local filepath, lineno, colno
-  filepath, lineno, colno = string.match(target, "([^:]+):(%d+):(%d+)")
+  filepath, lineno, colno = string.match(result, "([^:]+):(%d+):(%d+)")
   if not filepath then
-    filepath, lineno = string.match(target, "([^:]+):(%d+)")
+    filepath, lineno = string.match(result, "([^:]+):(%d+)")
     colno = 1
   end
   if not filepath then
-    filepath = target
+    filepath = result
     lineno = 1
     colno = 1
   end
 
-  if filepath then
-    if vim.fn.filereadable(filepath) == 1 then
-      vim.cmd('edit ' .. vim.fn.fnameescape(filepath))
-      vim.api.nvim_win_set_cursor(0, { tonumber(lineno), tonumber(colno) - 1 })
+  local expanded_path = vim.fn.expand(filepath)
 
-      local ns_id = vim.api.nvim_create_namespace('highlight_opened_line')
-      local buf = vim.api.nvim_get_current_buf()
-      local line_num = tonumber(lineno) - 1
-      vim.api.nvim_buf_add_highlight(buf, ns_id, 'Visual', line_num, 0, -1)
-      vim.defer_fn(function()
-        vim.api.nvim_buf_clear_namespace(buf, ns_id, 0, -1)
-      end, 500)
+  if filepath and vim.fn.filereadable(expanded_path) == 1 then
+    vim.cmd.edit(vim.fn.fnameescape(expanded_path))
+    vim.api.nvim_win_set_cursor(0, { tonumber(lineno), tonumber(colno) - 1 })
 
-    else
-      vim.notify('File not found: ' .. filepath, vim.log.levels.WARN)
-    end
+    -- Подсвечиваем строку в новом буфере
+    local target_buf = vim.api.nvim_get_current_buf()
+    vim.api.nvim_buf_clear_namespace(target_buf, ns_id, 0, -1)
+    vim.api.nvim_buf_add_highlight(target_buf, ns_id, 'Visual', tonumber(lineno) - 1, 0, -1)
+    vim.defer_fn(function()
+      vim.api.nvim_buf_clear_namespace(target_buf, ns_id, 0, -1)
+    end, 500)
+
+  elseif filepath then
+    vim.notify('File not found: ' .. expanded_path, vim.log.levels.WARN, { title = "Open Under Cursor" })
   else
-    vim.notify('Can not parse string', vim.log.levels.WARN)
+    vim.notify('Cannot parse string', vim.log.levels.WARN, { title = "Open Under Cursor" })
   end
 end
 
