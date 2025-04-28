@@ -2,6 +2,8 @@
 
 **Hodur.nvim** is a plugin for [Neovim](https://github.com/neovim/neovim) that allows you to quickly open a file located under the cursor.
 
+![demo](media/example_00.gif)
+
 ## Features
 
 - Jump to the file under the cursor.
