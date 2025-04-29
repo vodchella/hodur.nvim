@@ -1,5 +1,7 @@
 # Hodur.nvim
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 **Hodur.nvim** is a plugin for [Neovim](https://github.com/neovim/neovim) that allows you to quickly open a file located under the cursor.
 
 ![demo](media/example_00.gif)
