@@ -40,6 +40,15 @@ local function is_url(str)
   return str:match("^https?://") or str:match("^ftp://")
 end
 
+local function highlight_text(row, start_col, end_col)
+    local target_buf = vim.api.nvim_get_current_buf()
+    vim.api.nvim_buf_clear_namespace(target_buf, ns_id, 0, -1)
+    vim.api.nvim_buf_add_highlight(target_buf, ns_id, 'Visual', row, start_col, end_col)
+    vim.defer_fn(function()
+      vim.api.nvim_buf_clear_namespace(target_buf, ns_id, 0, -1)
+    end, 500)
+end
+
 function M.open_under_cursor()
   local buf = vim.api.nvim_get_current_buf()
   local total_lines = vim.api.nvim_buf_line_count(buf)
@@ -147,13 +156,8 @@ function M.open_under_cursor()
     vim.fn.setreg('+', filepath)
     vim.notify('URL copied to clipboard: ' .. filepath, vim.log.levels.INFO, { title = "Open Under Cursor" })
     -- Подсветка скопированного текста
-    local target_buf = vim.api.nvim_get_current_buf()
-    vim.api.nvim_buf_clear_namespace(target_buf, ns_id, 0, -1)
     local len = vim.fn.strchars(filepath)
-    vim.api.nvim_buf_add_highlight(target_buf, ns_id, 'Visual', cur_row, cur_col - len, cur_col)
-    vim.defer_fn(function()
-      vim.api.nvim_buf_clear_namespace(target_buf, ns_id, 0, -1)
-    end, 500)
+    highlight_text(cur_row, cur_col - len, cur_col)
     return
   end
 
@@ -164,12 +168,7 @@ function M.open_under_cursor()
     vim.api.nvim_win_set_cursor(0, { tonumber(lineno), tonumber(colno) - 1 })
 
     -- Подсветка строки
-    local target_buf = vim.api.nvim_get_current_buf()
-    vim.api.nvim_buf_clear_namespace(target_buf, ns_id, 0, -1)
-    vim.api.nvim_buf_add_highlight(target_buf, ns_id, 'Visual', tonumber(lineno) - 1, 0, -1)
-    vim.defer_fn(function()
-      vim.api.nvim_buf_clear_namespace(target_buf, ns_id, 0, -1)
-    end, 500)
+    highlight_text(tonumber(lineno) - 1, 0, -1)
 
   elseif filepath then
     vim.notify('File not found: ' .. expanded_path, vim.log.levels.WARN, { title = "Open Under Cursor" })
