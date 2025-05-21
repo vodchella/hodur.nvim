@@ -1,6 +1,7 @@
 local M = {}
 
 local ns_id = vim.api.nvim_create_namespace('highlight_opened_line')
+local notify_title = 'Hodur.nvim'
 
 local function strip_wrapping_chars(s)
   local pairs = {
@@ -169,7 +170,7 @@ function M.open_under_cursor()
       start_col = cur_col - len
       end_col = cur_col
     end
-    vim.notify('URL copied to clipboard: ' .. filepath, vim.log.levels.INFO, { title = "Open Under Cursor" })
+    vim.notify('URL copied to clipboard: ' .. filepath, vim.log.levels.INFO, { title = notify_title })
     highlight_text(cur_row, start_col, end_col)
     return
   end
@@ -184,9 +185,9 @@ function M.open_under_cursor()
     highlight_text(tonumber(lineno) - 1, 0, -1)
 
   elseif filepath then
-    vim.notify('File not found: ' .. expanded_path, vim.log.levels.WARN, { title = "Open Under Cursor" })
+    vim.notify('File not found: ' .. expanded_path, vim.log.levels.WARN, { title = notify_title })
   else
-    vim.notify('Cannot parse string', vim.log.levels.WARN, { title = "Open Under Cursor" })
+    vim.notify('Cannot parse string', vim.log.levels.WARN, { title = notify_title })
   end
 end
 
