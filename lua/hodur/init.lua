@@ -61,6 +61,7 @@ function M.open_under_cursor()
 
   local cur_row = row
   local cur_col = col
+  local last_col = col
 
   -- Идём влево
   do
@@ -121,6 +122,7 @@ function M.open_under_cursor()
 
       -- Переход на строку ниже
       cur_row = cur_row + 1
+      last_col = cur_col
       cur_col = 0
       if cur_row < total_lines then
         local next_line = vim.api.nvim_buf_get_lines(buf, cur_row, cur_row + 1, false)[1] or ""
@@ -154,10 +156,21 @@ function M.open_under_cursor()
 
   if is_url(filepath) then
     vim.fn.setreg('+', filepath)
-    vim.notify('URL copied to clipboard: ' .. filepath, vim.log.levels.INFO, { title = "Open Under Cursor" })
-    -- Подсветка скопированного текста
     local len = vim.fn.strchars(filepath)
-    highlight_text(cur_row, cur_col - len, cur_col)
+    if cur_col < 0 then
+      start_col = last_col
+      end_col = last_col + len
+      cur_row = cur_row - 1
+    elseif cur_col == 0 then
+      start_col = last_col - len
+      end_col = last_col
+      cur_row = cur_row - 1
+    else
+      start_col = cur_col - len
+      end_col = cur_col
+    end
+    vim.notify('URL copied to clipboard: ' .. filepath, vim.log.levels.INFO, { title = "Open Under Cursor" })
+    highlight_text(cur_row, start_col, end_col)
     return
   end
 
