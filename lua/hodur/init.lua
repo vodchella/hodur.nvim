@@ -34,6 +34,12 @@ local function should_continue_down(line)
   return last_char == "." or last_char == ":"
 end
 
+local function is_url(str)
+  if type(str) ~= "string" then return false end
+  str = str:lower()
+  return str:match("^https?://") or str:match("^ftp://")
+end
+
 function M.open_under_cursor()
   local buf = vim.api.nvim_get_current_buf()
   local total_lines = vim.api.nvim_buf_line_count(buf)
@@ -44,10 +50,13 @@ function M.open_under_cursor()
 
   local result = ""
 
+  local cur_row = row
+  local cur_col = col
+
   -- Идём влево
   do
-    local cur_row = row
-    local cur_col = col
+    cur_row = row
+    cur_col = col
 
     while cur_row >= 0 do
       local line = vim.api.nvim_buf_get_lines(buf, cur_row, cur_row + 1, false)[1] or ""
@@ -82,8 +91,8 @@ function M.open_under_cursor()
 
   -- Идём вправо
   do
-    local cur_row = row
-    local cur_col = col + 1
+    cur_row = row
+    cur_col = col + 1
 
     while cur_row < total_lines do
       local line = vim.api.nvim_buf_get_lines(buf, cur_row, cur_row + 1, false)[1] or ""
@@ -132,6 +141,20 @@ function M.open_under_cursor()
     filepath = result
     lineno = 1
     colno = 1
+  end
+
+  if is_url(filepath) then
+    vim.fn.setreg('+', filepath)
+    vim.notify('URL copied to clipboard: ' .. filepath, vim.log.levels.INFO, { title = "Open Under Cursor" })
+    -- Подсветка скопированного текста
+    local target_buf = vim.api.nvim_get_current_buf()
+    vim.api.nvim_buf_clear_namespace(target_buf, ns_id, 0, -1)
+    local len = vim.fn.strchars(filepath)
+    vim.api.nvim_buf_add_highlight(target_buf, ns_id, 'Visual', cur_row, cur_col - len, cur_col)
+    vim.defer_fn(function()
+      vim.api.nvim_buf_clear_namespace(target_buf, ns_id, 0, -1)
+    end, 500)
+    return
   end
 
   local expanded_path = vim.fn.expand(filepath)
