@@ -1,10 +1,14 @@
-# Hodur.nvim
+# Hodur [![Awesome](https://awesome.re/badge.svg)](https://github.com/sindresorhus/awesome)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **Hodur.nvim** is a plugin for [Neovim](https://github.com/neovim/neovim) that allows you to quickly open a file or copy URL located under the cursor.
 
 ![demo](media/example_00.gif)
+
+## Contents
+- [Features](#features)
+- [Installation](#installation)
 
 ## Features
 
