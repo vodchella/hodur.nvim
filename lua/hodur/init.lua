@@ -178,7 +178,7 @@ function M.open_under_cursor()
   local expanded_path = vim.fn.expand(filepath)
 
   if filepath and vim.fn.filereadable(expanded_path) == 1 then
-    vim.cmd.edit(vim.fn.fnameescape(expanded_path))
+    vim.cmd('tab drop ' .. vim.fn.fnameescape(expanded_path))
     vim.api.nvim_win_set_cursor(0, { tonumber(lineno), tonumber(colno) - 1 })
 
     -- Подсветка строки
