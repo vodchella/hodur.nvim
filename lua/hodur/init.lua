@@ -47,6 +47,8 @@ local function highlight_text(row, start_col, end_col)
     vim.api.nvim_buf_add_highlight(target_buf, ns_id, 'Visual', row, start_col, end_col)
     vim.defer_fn(function()
       vim.api.nvim_buf_clear_namespace(target_buf, ns_id, 0, -1)
+      vim.cmd("startinsert")
+      vim.cmd("stopinsert")
     end, 500)
 end
 
