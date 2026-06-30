@@ -1,7 +1,25 @@
 local M = {}
 
+M.term_dirs = {}
+
 local ns_id = vim.api.nvim_create_namespace('highlight_opened_line')
 local notify_title = 'Hodur.nvim'
+
+local function handle_term_request(ev)
+    local val = ev.data.sequence
+    local prefix = '\027]7;file://'
+
+    if not vim.startswith(val, prefix) then
+        return
+    end
+
+    local path = val:sub(#prefix + 1)
+    path = path:gsub('^[^/]*', '')
+    path = vim.uri_to_fname('file://' .. path)
+
+    local bufnr = ev.buf
+    M.term_dirs[bufnr] = path
+end
 
 local function strip_wrapping_chars(s)
   local pairs = {
@@ -177,8 +195,15 @@ function M.open_under_cursor()
     return
   end
 
-  local expanded_path = vim.fn.expand(filepath)
+  -- Временно меняем текущий каталог
+  bufnr   = vim.api.nvim_get_current_buf()
+  buf_dir = M.term_dirs[bufnr]
+  cur_dir = vim.fn.getcwd()
+  if buf_dir then
+    vim.cmd.tcd(vim.fn.fnameescape(buf_dir))
+  end
 
+  local expanded_path = vim.fn.expand(filepath)
   if filepath and vim.fn.filereadable(expanded_path) == 1 then
     vim.cmd('drop ' .. vim.fn.fnameescape(expanded_path))
     vim.api.nvim_win_set_cursor(0, { tonumber(lineno), tonumber(colno) - 1 })
@@ -191,12 +216,22 @@ function M.open_under_cursor()
   else
     vim.notify('Cannot parse string', vim.log.levels.WARN, { title = notify_title })
   end
+
+  -- Восстанавливаем текущий каталог
+  if buf_dir then
+    vim.cmd.tcd(vim.fn.fnameescape(cur_dir))
+  end
+
 end
 
 function M.setup(opts)
   opts = opts or {}
-  local key = opts.key or "<C-g>"
 
+  vim.api.nvim_create_autocmd('TermRequest', {
+      callback = handle_term_request,
+  })
+
+  local key = opts.key or "<C-g>"
   vim.keymap.set('n', key, M.open_under_cursor, { noremap = true, silent = true })
 end
 
